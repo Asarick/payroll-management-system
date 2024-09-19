@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayrollPro - Employee Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="login-container">
+        <h1>Welcome to your payroll management system</h1>
+        <form id="loginForm">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            <button type="submit" name="login">Login</button>
+        </form>
+
+        <form id="passwordChangeForm" style="display: none;">
+            <label for="newPassword">New Password:</label>
+            <input type="password" id="newPassword" name="newPassword" required>
+            <label for="confirmPassword">Confirm New Password:</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required>
+            <button type="submit" name="change_password">Set New Password</button>
+        </form>
+
+        <p id="errorMessage" class="error-message"></p>
+
+        <div class="admin-link">
+            <a href="adminlogin.html">Are you an admin? Click here to login</a>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const loginForm = document.getElementById('loginForm');
+            const passwordChangeForm = document.getElementById('passwordChangeForm');
+            const errorMessage = document.getElementById('errorMessage');
+
+            loginForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+
+                // Simulating a login request
+                fetch('/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.passwordChanged) {
+                                window.location.href = 'employee_dashboard.html';
+                            } else {
+                                loginForm.style.display = 'none';
+                                passwordChangeForm.style.display = 'flex';
+                            }
+                        } else {
+                            errorMessage.textContent = 'Invalid username or password.';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        errorMessage.textContent = 'An error occurred. Please try again.';
+                    });
+            });
+
+            passwordChangeForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+
+                if (newPassword !== confirmPassword) {
+                    errorMessage.textContent = 'Passwords do not match.';
+                    return;
+                }
+
+                // Simulating a password change request
+                fetch('/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ newPassword }),
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            window.location.href = 'employee_dashboard.html';
+                        } else {
+                            errorMessage.textContent = 'Failed to change password. Please try again.';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        errorMessage.textContent = 'An error occurred. Please try again.';
+                    });
+            });
+        });
+    </script>
+</body>
+
+</html>

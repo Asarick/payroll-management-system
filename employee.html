@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Dashboard - PayrollPro</title>
+    <link rel="stylesheet" href="employee.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <h1>PayrollPro Employee Dashboard</h1>
+        <nav id="mainNav">
+            <button onclick="showSection('currentSalary')"><i class="fas fa-money-bill-wave"></i> Current Salary</button>
+            <button onclick="showSection('pastSalaries')"><i class="fas fa-history"></i> Past Salaries</button>
+            <button onclick="showSection('personalInfo')"><i class="fas fa-user"></i> Personal Information</button>
+            <button onclick="showSection('feedback')"><i class="fas fa-comment"></i> Feedback</button>
+            <button onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            <button id="themeToggle"><i class="fas fa-adjust"></i> Theme</button>
+        </nav>
+
+        </nav>
+    </header>
+
+    <main>
+        <section id="currentSalary" class="active">
+            <h2>Current Salary Information</h2>
+            <div id="currentSalaryInfo"></div>
+            <button onclick="downloadPayslip()"><i class="fas fa-file-download"></i> Download Payslip</button>
+        </section>
+
+        <section id="pastSalaries">
+            <h2>Past Salaries</h2>
+            <div id="pastSalariesList"></div>
+        </section>
+
+        <section id="personalInfo">
+            <h2>Personal Information</h2>
+            <form id="personalInfoForm">
+                <label for="name"><i class="fas fa-user"></i> Name:</label>
+                <input type="text" id="name" readonly>
+                <label for="email"><i class="fas fa-envelope"></i> Email:</label>
+                <input type="email" id="email" readonly>
+                <label for="phone"><i class="fas fa-phone"></i> Phone:</label>
+                <input type="tel" id="phone">
+                <label for="address"><i class="fas fa-home"></i> Address:</label>
+                <textarea id="address"></textarea>
+                <button type="submit"><i class="fas fa-save"></i> Update Information</button>
+            </form>
+        </section>
+
+        <section id="feedback">
+            <h2>Send Feedback to Admin</h2>
+            <form id="feedbackForm">
+                <label for="feedbackType"><i class="fas fa-tag"></i> Feedback Type:</label>
+                <select id="feedbackType" required>
+                    <option value="complaint">Complaint</option>
+                    <option value="suggestion">Suggestion</option>
+                    <option value="query">Query</option>
+                </select>
+                <label for="feedbackMessage"><i class="fas fa-comment"></i> Message:</label>
+                <textarea id="feedbackMessage" required></textarea>
+                <button type="submit"><i class="fas fa-paper-plane"></i> Send Feedback</button>
+            </form>
+        </section>
+    </main>
+
+    <script>
+        let currentEmployee = null;
+        let allowances = JSON.parse(localStorage.getItem('allowances')) || {
+            house: 0,
+            transport: 0,
+            hardship: 0
+        };
+
+        let deductionRates = JSON.parse(localStorage.getItem('deductionRates')) || {
+            nhif: 2.5,
+            nssf: 6,
+            paye: 30,
+            housing: 1.5
+        };
+
+        // Function to get current employee data from localStorage
+        function getCurrentEmployeeData() {
+            const employeeData = JSON.parse(localStorage.getItem('currentEmployee'));
+            if (!employeeData) {
+                console.error('No employee data found in localStorage');
+                alert('Failed to load employee data. Please log in again.');
+                window.location.href = 'login.php';
+                return null;
+            }
+            return employeeData;
+        }
+
+        // Function to show/hide sections
+        function showSection(sectionId) {
+            document.querySelectorAll('section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+        }
+
+        // Function to load employee data
+        function loadEmployeeData() {
+            currentEmployee = getCurrentEmployeeData();
+            if (currentEmployee) {
+                refreshAllowancesAndDeductions(); // Add this line
+                loadCurrentSalary(currentEmployee);
+                loadPastSalaries(currentEmployee);
+                loadPersonalInfo(currentEmployee);
+            }
+        }
+
+        // Function to load current salary information
+        function loadCurrentSalary(employeeData) {
+            const salaryInfo = document.getElementById('currentSalaryInfo');
+            const grossSalary = calculateGrossSalary(employeeData.salary);
+            const deductions = calculateDeductions(grossSalary);
+            const netSalary = grossSalary - deductions.total;
+
+            salaryInfo.innerHTML = `
+        <h3>Salary Breakdown for Current Month</h3>
+        <p>Basic Salary: Ksh${employeeData.salary}</p>
+        <p>House Allowance: Ksh${allowances.house}</p>
+        <p>Transport Allowance: Ksh${allowances.transport}</p>
+        <p>Hardship Allowance: Ksh${allowances.hardship}</p>
+        <h4>Deductions:</h4>
+        <p>NHIF: Ksh${deductions.nhif.toFixed(2)}</p>
+        <p>NSSF: Ksh${deductions.nssf.toFixed(2)}</p>
+        <p>PAYE: Ksh${deductions.paye.toFixed(2)}</p>
+        <p>Housing Levy: Ksh${deductions.housing.toFixed(2)}</p>
+        <h4>Net Salary: Ksh${netSalary.toFixed(2)}</h4>
+    `;
+        }
+
+        // Function to calculate gross salary
+        function calculateGrossSalary(basicSalary) {
+            return parseFloat(basicSalary) + allowances.house + allowances.transport + allowances.hardship;
+        }
+
+        // Function to calculate deductions
+        function calculateDeductions(grossSalary) {
+            const nhif = grossSalary * (deductionRates.nhif / 100);
+            const nssf = grossSalary * (deductionRates.nssf / 100);
+            const paye = grossSalary * (deductionRates.paye / 100);
+            const housing = grossSalary * (deductionRates.housing / 100);
+            const total = nhif + nssf + paye + housing;
+
+            return { nhif, nssf, paye, housing, total };
+        }
+
+        function refreshAllowancesAndDeductions() {
+            allowances = JSON.parse(localStorage.getItem('allowances')) || allowances;
+            deductionRates = JSON.parse(localStorage.getItem('deductionRates')) || deductionRates;
+        }
+
+        // Call this function when the page loads
+        window.onload = function () {
+            refreshAllowancesAndDeductions();
+            showSection('currentSalary');
+            loadEmployeeData();
+        };
+
+        // Function to load past salaries
+        function loadPastSalaries(employeeData) {
+            const pastSalariesList = document.getElementById('pastSalariesList');
+            pastSalariesList.innerHTML = '<h3>Past Salaries</h3>';
+            if (employeeData.pastSalaries && employeeData.pastSalaries.length > 0) {
+                employeeData.pastSalaries.forEach(salary => {
+                    pastSalariesList.innerHTML += `<p>${salary.month}: $${salary.netSalary.toFixed(2)}</p>`;
+                });
+            } else {
+                pastSalariesList.innerHTML += '<p>No past salary data available.</p>';
+            }
+        }
+
+        // Function to download payslip
+        function downloadPayslip() {
+            // This function should be implemented based on your specific requirements
+            // For now, we'll just show an alert
+            alert('Payslip download initiated. Please check your downloads folder.');
+        }
+
+        // Function to load personal information
+        function loadPersonalInfo(employeeData) {
+            document.getElementById('name').value = employeeData.name;
+            document.getElementById('email').value = employeeData.email;
+            document.getElementById('phone').value = employeeData.phone || '';
+            document.getElementById('address').value = employeeData.address || '';
+        }
+
+        // Function to update personal information
+        document.getElementById('personalInfoForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const updatedInfo = {
+                phone: document.getElementById('phone').value,
+                address: document.getElementById('address').value,
+            };
+
+            // Update the employee data in localStorage
+            currentEmployee.phone = updatedInfo.phone;
+            currentEmployee.address = updatedInfo.address;
+            localStorage.setItem('currentEmployee', JSON.stringify(currentEmployee));
+
+            // Update in the main employees array
+            const employees = JSON.parse(localStorage.getItem('employees')) || [];
+            const index = employees.findIndex(emp => emp.id === currentEmployee.id);
+            if (index !== -1) {
+                employees[index] = { ...employees[index], ...updatedInfo };
+                localStorage.setItem('employees', JSON.stringify(employees));
+            }
+
+            alert('Personal information updated successfully');
+        });
+
+        // Function to send feedback
+        document.getElementById('feedbackForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const feedbackData = {
+                employeeId: currentEmployee.id,
+                type: document.getElementById('feedbackType').value,
+                message: document.getElementById('feedbackMessage').value,
+                date: new Date().toISOString()
+            };
+
+            // Store feedback in localStorage
+            const feedbacks = JSON.parse(localStorage.getItem('feedbacks')) || [];
+            feedbacks.push(feedbackData);
+            localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
+
+            alert('Feedback sent successfully');
+            document.getElementById('feedbackMessage').value = '';
+        });
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            const isDarkTheme = document.body.classList.contains('dark-theme');
+            localStorage.setItem('darkTheme', isDarkTheme);
+        }
+
+        // Add this to your existing DOMContentLoaded event listener
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('darkTheme');
+        if (savedTheme === 'true') {
+            document.body.classList.add('dark-theme');
+        }
+
+        // Function to handle logout
+        function logout() {
+            localStorage.removeItem('currentEmployee');
+            alert('Logged out successfully');
+            window.location.href = 'login.html';
+        }
+
+        // Initialize the page
+        window.onload = function () {
+            showSection('currentSalary');
+            loadEmployeeData();
+        };
+    </script>
+</body>
+
+</html>

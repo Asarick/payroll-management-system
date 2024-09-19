@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayrollPro - Admin Panel</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <header>
+        <h1>PayrollPro Admin Panel</h1>
+        <nav>
+            <button onclick="showSection('employees')"><i class="fas fa-users"></i> Employees</button>
+            <button onclick="showSection('departments')"><i class="fas fa-building"></i> Departments</button>
+            <button onclick="showSection('salaries')"><i class="fas fa-money-bill-wave"></i> Salaries</button>
+            <button onclick="showSection('reports')"><i class="fas fa-chart-bar"></i> Reports</button>
+            <button id="themeToggle"><i class="fas fa-adjust"></i> Theme</button>
+        </nav>
+    </header>
+
+    <main>
+        <section id="employees" class="active">
+            <h2>Manage Employees</h2>
+            <button onclick="showModal('addEmployee')"><i class="fas fa-user-plus"></i> Add Employee</button>
+            <table id="employeeTable">
+                <!-- Employee data will be populated here -->
+            </table>
+        </section>
+
+        <section id="departments">
+            <h2>Manage Departments</h2>
+            <button onclick="showModal('addDepartment')"><i class="fas fa-plus-circle"></i> Add Department</button>
+            <table id="departmentTable">
+                <!-- Department data will be populated here -->
+            </table>
+        </section>
+
+        <section id="salaries">
+            <h2>Manage Salaries</h2>
+            <h3>Deduction Rates</h3>
+            <form id="deductionForm">
+                <label for="nhifRate">NHIF Rate (%): </label>
+                <input type="number" id="nhifRate" name="nhifRate" min="0" max="100" step="0.1" required>
+
+                <label for="nssfRate">NSSF Rate (%): </label>
+                <input type="number" id="nssfRate" name="nssfRate" min="0" max="100" step="0.1" required>
+
+                <label for="payeRate">PAYE Rate (%): </label>
+                <input type="number" id="payeRate" name="payeRate" min="0" max="100" step="0.1" required>
+
+                <label for="housingRate">Housing Levy Rate (%): </label>
+                <input type="number" id="housingRate" name="housingRate" min="0" max="100" step="0.1" required>
+
+                <button type="submit">Update Deduction Rates</button>
+            </form>
+
+            <h3>Allowances</h3>
+            <form id="allowanceForm">
+                <label for="houseAllowance">House Allowance: </label>
+                <input type="number" id="houseAllowance" name="houseAllowance" min="0" step="0.01" required>
+
+                <label for="transportAllowance">Transport Allowance: </label>
+                <input type="number" id="transportAllowance" name="transportAllowance" min="0" step="0.01" required>
+
+                <label for="hardshipAllowance">Hardship Allowance: </label>
+                <input type="number" id="hardshipAllowance" name="hardshipAllowance" min="0" step="0.01" required>
+
+                <button type="submit">Update Allowances</button>
+            </form>
+
+            <h3>Salary Information</h3>
+            <table id="salaryTable">
+                <!-- Salary data will be populated here -->
+            </table>
+        </section>
+
+        <section id="reports">
+            <h2>Generate Reports</h2>
+            <button onclick="generatePayrollReport()"><i class="fas fa-file-alt"></i> Generate Payroll Report</button>
+            <div id="payrollReportDisplay"></div>
+
+            <h3>Employee Feedback</h3>
+            <div id="feedbackDisplay"></div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="addEmployeeModal" class="modal">
+        <div class="modal-content">
+            <h2>Add New Employee</h2>
+            <form id="addEmployeeForm">
+                <label for="empPhoto">Profile Photo:</label>
+                <input type="file" id="empPhoto" accept="image/*">
+
+                <label for="empName">Name:</label>
+                <input type="text" id="empName" required>
+
+                <label for="empEmail">Email:</label>
+                <input type="email" id="empEmail" required>
+
+                <label for="empDepartment">Department:</label>
+                <select id="empDepartment" required>
+                    <!-- Department options will be populated dynamically -->
+                </select>
+
+                <label for="empSalary">Salary:</label>
+                <input type="number" id="empSalary" required>
+
+                <button type="submit"><i class="fas fa-save"></i> Add Employee</button>
+                <button type="button" onclick="closeModal('addEmployee')"><i class="fas fa-times"></i> Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="addDepartmentModal" class="modal">
+        <div class="modal-content">
+            <h2>Add New Department</h2>
+            <form id="addDepartmentForm">
+                <label for="deptName">Department Name:</label>
+                <input type="text" id="deptName" required>
+
+                <button type="submit"><i class="fas fa-save"></i> Add Department</button>
+                <button type="button" onclick="closeModal('addDepartment')"><i class="fas fa-times"></i> Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="employeeReportModal" class="modal">
+        <div class="modal-content">
+            <h2>Employee Salary Report</h2>
+            <div id="employeeReportContent"></div>
+            <button onclick="closeModal('employeeReport')"><i class="fas fa-times"></i> Close</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize data from local storage or use default values
+        let paymentHistory = JSON.parse(localStorage.getItem('paymentHistory')) || [];
+        let employeeFeedback = JSON.parse(localStorage.getItem('employeeFeedback')) || [];
+        let employees = JSON.parse(localStorage.getItem('employees')) || [];
+        let departments = JSON.parse(localStorage.getItem('departments')) || [];
+        let deductionRates = JSON.parse(localStorage.getItem('deductionRates')) || {
+            nhif: 2.5,
+            nssf: 6,
+            paye: 30,
+            housing: 1.5
+        };
+        let allowances = JSON.parse(localStorage.getItem('allowances')) || {
+            house: 0,
+            transport: 0,
+            hardship: 0
+        };
+
+        // Function to save data to local storage
+        function saveData() {
+            localStorage.setItem('employees', JSON.stringify(employees));
+            localStorage.setItem('departments', JSON.stringify(departments));
+            localStorage.setItem('deductionRates', JSON.stringify(deductionRates));
+            localStorage.setItem('allowances', JSON.stringify(allowances));
+            localStorage.setItem('paymentHistory', JSON.stringify(paymentHistory));
+            localStorage.setItem('employeeFeedback', JSON.stringify(employeeFeedback));
+        }
+
+        // Function to show/hide sections
+        function showSection(sectionId) {
+            document.querySelectorAll('section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+
+            if (sectionId === 'reports') {
+                displayEmployeeFeedback();
+            }
+        }
+
+        // Function to show/hide modals
+        function showModal(modalId) {
+            document.getElementById(`${modalId}Modal`).style.display = 'block';
+            if (modalId === 'addEmployee') {
+                populateDepartmentDropdown();
+            }
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(`${modalId}Modal`).style.display = 'none';
+        }
+
+        // Function to populate department dropdown
+        function populateDepartmentDropdown() {
+            const select = document.getElementById('empDepartment');
+            select.innerHTML = '';
+            departments.forEach(dept => {
+                const option = document.createElement('option');
+                option.value = dept.name;
+                option.textContent = dept.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Function to generate a one-time password
+        function generateOneTimePassword() {
+            return Math.random().toString(36).slice(-8);
+        }
+
+        // Function to add an employee
+        function addEmployee(event) {
+            event.preventDefault();
+            const name = document.getElementById('empName').value;
+            const email = document.getElementById('empEmail').value;
+            const department = document.getElementById('empDepartment').value;
+            const salary = document.getElementById('empSalary').value;
+            const photoFile = document.getElementById('empPhoto').files[0];
+
+            if (employees.some(emp => emp.email.toLowerCase() === email.toLowerCase())) {
+                alert('An employee with this email already exists. Cannot add duplicate employee.');
+                return;
+            }
+
+            const oneTimePassword = generateOneTimePassword();
+
+            const newEmployee = {
+                id: employees.length + 1,
+                name,
+                email,
+                department,
+                salary,
+                oneTimePassword,
+                passwordChanged: false,
+                photoUrl: photoFile ? URL.createObjectURL(photoFile) : null
+            };
+
+            employees.push(newEmployee);
+            saveData();
+            updateEmployeeTable();
+            closeModal('addEmployee');
+            alert(`Employee added successfully. One-time password: ${oneTimePassword}`);
+        }
+
+        // Function to add a department
+        function addDepartment(event) {
+            event.preventDefault();
+            const name = document.getElementById('deptName').value;
+
+            if (departments.some(dept => dept.name.toLowerCase() === name.toLowerCase())) {
+                alert('A department with this name already exists. Cannot add duplicate department.');
+                return;
+            }
+
+            const newDepartment = {
+                id: departments.length + 1,
+                name
+            };
+
+            departments.push(newDepartment);
+            saveData();
+            updateDepartmentTable();
+            closeModal('addDepartment');
+            alert('Department added successfully.');
+        }
+
+        // Function to update employee table
+        function updateEmployeeTable() {
+            const table = document.getElementById('employeeTable');
+            table.innerHTML = `
+                <tr>
+                    <th>Photo</th>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Department</th>
+                    <th>Salary</th>
+                    <th>Password Changed</th>
+                    <th>Actions</th>
+                </tr>
+            `;
+
+            employees.forEach(emp => {
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td>${emp.photoUrl ? `<img src="${emp.photoUrl}" alt="${emp.name}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 50%;">` : 'No photo'}</td>
+                    <td>${emp.id}</td>
+                    <td>${emp.name}</td>
+                    <td>${emp.email}</td>
+                    <td>${emp.department}</td>
+                    <td>${emp.salary}</td>
+                    <td>${emp.passwordChanged ? 'Yes' : 'No'}</td>
+                    <td>
+                        <button onclick="editEmployee(${emp.id})"><i class="fas fa-edit"></i> Edit Salary</button>
+                        <button onclick="deleteEmployee(${emp.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                        <button onclick="resetPassword(${emp.id})"><i class="fas fa-key"></i> Reset Password</button>
+                        <button onclick="generateEmployeeReport(${emp.id})"><i class="fas fa-file-alt"></i> Generate Report</button>
+                    </td>
+                `;
+            });
+        }
+
+       // Function to update department table
+       function updateDepartmentTable() {
+            const table = document.getElementById('departmentTable');
+            table.innerHTML = `
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Actions</th>
+                </tr>
+            `;
+
+            departments.forEach(dept => {
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td>${dept.id}</td>
+                    <td>${dept.name}</td>
+                    <td>
+                        <button onclick="editDepartment(${dept.id})"><i class="fas fa-edit"></i> Edit</button>
+                        <button onclick="deleteDepartment(${dept.id})"><i class="fas fa-trash-alt"></i> Delete</button>
+                    </td>
+                `;
+            });
+        }
+
+        // Function to reset an employee's password
+        function resetPassword(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                const newPassword = generateOneTimePassword();
+                employee.oneTimePassword = newPassword;
+                employee.passwordChanged = false;
+                saveData();
+                alert(`New one-time password for ${employee.name}: ${newPassword}`);
+            }
+        }
+
+        // Function to delete an employee
+        function deleteEmployee(employeeId) {
+            if (confirm('Are you sure you want to delete this employee?')) {
+                employees = employees.filter(emp => emp.id !== employeeId);
+                saveData();
+                updateEmployeeTable();
+            }
+        }
+
+        // Function to delete a department
+        function deleteDepartment(departmentId) {
+            if (confirm('Are you sure you want to delete this department?')) {
+                departments = departments.filter(dept => dept.id !== departmentId);
+                saveData();
+                updateDepartmentTable();
+            }
+        }
+
+        function editEmployee(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (employee) {
+                const newSalary = prompt(`Enter new salary for ${employee.name}:`, employee.salary);
+                if (newSalary !== null && !isNaN(newSalary)) {
+                    employee.salary = parseFloat(newSalary);
+                    saveData();
+                    updateEmployeeTable();
+                    updateSalaryTable();
+                    alert(`Salary updated for ${employee.name}`);
+                }
+            }
+        }
+
+        // Function to edit a department
+        function editDepartment(departmentId) {
+            const department = departments.find(dept => dept.id === departmentId);
+            if (department) {
+                const newName = prompt(`Enter new name for department ${department.name}:`, department.name);
+                if (newName !== null && newName.trim() !== "") {
+                    department.name = newName.trim();
+                    saveData();
+                    updateDepartmentTable();
+                    alert(`Department name updated to ${department.name}`);
+                }
+            }
+        }
+
+        // Function to update salary table
+        function updateSalaryTable() {
+            const table = document.getElementById('salaryTable');
+            table.innerHTML = `
+                <tr>
+                    <th>Name</th>
+                    <th>Basic Salary</th>
+                    <th>House Allowance</th>
+                    <th>Transport Allowance</th>
+                    <th>Hardship Allowance</th>
+                    <th>Gross Salary</th>
+                    <th>NHIF</th>
+                    <th>NSSF</th>
+                    <th>PAYE</th>
+                    <th>Housing Levy</th>
+                    <th>Net Salary</th>
+                </tr>
+            `;
+
+            employees.forEach(emp => {
+                const grossSalary = calculateGrossSalary(emp.salary);
+                const deductions = calculateDeductions(grossSalary);
+                const netSalary = grossSalary - deductions.total;
+
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td>${emp.name}</td>
+                    <td>${emp.salary}</td>
+                    <td>${allowances.house}</td>
+                    <td>${allowances.transport}</td>
+                    <td>${allowances.hardship}</td>
+                    <td>${grossSalary.toFixed(2)}</td>
+                    <td>${deductions.nhif.toFixed(2)}</td>
+                    <td>${deductions.nssf.toFixed(2)}</td>
+                    <td>${deductions.paye.toFixed(2)}</td>
+                    <td>${deductions.housing.toFixed(2)}</td>
+                    <td>${netSalary.toFixed(2)}</td>
+                `;
+            });
+
+            // Add "Pay All" button
+            const payAllButton = document.createElement('button');
+            payAllButton.innerHTML = '<i class="fas fa-money-bill-wave"></i> Pay All Employees';
+            payAllButton.onclick = payAllEmployees;
+            table.parentNode.insertBefore(payAllButton, table.nextSibling);
+        }
+
+        // Function to calculate gross salary
+        function calculateGrossSalary(basicSalary) {
+            return parseFloat(basicSalary) + allowances.house + allowances.transport + allowances.hardship;
+        }
+
+        // Function to calculate deductions
+        function calculateDeductions(grossSalary) {
+            const nhif = grossSalary * (deductionRates.nhif / 100);
+            const nssf = grossSalary * (deductionRates.nssf / 100);
+            const paye = grossSalary * (deductionRates.paye / 100);
+            const housing = grossSalary * (deductionRates.housing / 100);
+            const total = nhif + nssf + paye + housing;
+
+            return { nhif, nssf, paye, housing, total };
+        }
+
+        // Function to pay all employees
+        function payAllEmployees() {
+            const paymentDate = new Date();
+            const paymentRecord = {
+                date: paymentDate.toISOString(),
+                employees: employees.map(emp => ({
+                    id: emp.id,
+                    name: emp.name,
+                    amount: calculateNetSalary(emp.salary)
+                }))
+            };
+            paymentHistory.push(paymentRecord);
+            saveData();
+            alert('All employees have been paid!');
+        }
+
+        function calculateNetSalary(basicSalary) {
+            const grossSalary = calculateGrossSalary(basicSalary);
+            const deductions = calculateDeductions(grossSalary);
+            return grossSalary - deductions.total;
+        }
+
+        // Function to update deduction rates
+        function updateDeductionRates(event) {
+            event.preventDefault();
+            deductionRates.nhif = parseFloat(document.getElementById('nhifRate').value);
+            deductionRates.nssf = parseFloat(document.getElementById('nssfRate').value);
+            deductionRates.paye = parseFloat(document.getElementById('payeRate').value);
+            deductionRates.housing = parseFloat(document.getElementById('housingRate').value);
+            saveData();
+            updateSalaryTable();
+            alert('Deduction rates updated successfully');
+        }
+
+        // Function to update allowances
+        function updateAllowances(event) {
+            event.preventDefault();
+            allowances.house = parseFloat(document.getElementById('houseAllowance').value);
+            allowances.transport = parseFloat(document.getElementById('transportAllowance').value);
+            allowances.hardship = parseFloat(document.getElementById('hardshipAllowance').value);
+            saveData();
+            updateSalaryTable();
+            alert('Allowances updated successfully');
+        }
+
+        // Function to generate a payroll report
+        function generatePayrollReport() {
+            const reportDisplay = document.getElementById('payrollReportDisplay');
+            reportDisplay.innerHTML = '<h3>Payroll Report</h3>';
+
+            if (paymentHistory.length === 0) {
+                reportDisplay.innerHTML += '<p>No payment history available.</p>';
+                return;
+            }
+
+            const latestPayment = paymentHistory[paymentHistory.length - 1];
+            const paymentDate = new Date(latestPayment.date);
+
+            reportDisplay.innerHTML += `
+                <p>Latest Payment Date: ${paymentDate.toLocaleDateString()} (${paymentDate.toLocaleString('en-us', { weekday: 'long' })})</p>
+                <table>
+                    <tr>
+                        <th>Employee Name</th>
+                        <th>Amount Paid</th>
+                    </tr>
+                    ${latestPayment.employees.map(emp => `
+                        <tr>
+                            <td>${emp.name}</td>
+                            <td>Ksh ${emp.amount.toFixed(2)}</td>
+                        </tr>
+                    `).join('')}
+                </table>
+            `;
+        }
+
+        function displayEmployeeFeedback() {
+            const feedbackDisplay = document.getElementById('feedbackDisplay');
+            feedbackDisplay.innerHTML = '<h3>Employee Feedback</h3>';
+
+            if (employeeFeedback.length === 0) {
+                feedbackDisplay.innerHTML += '<p>No feedback available.</p>';
+                return;
+            }
+
+            employeeFeedback.forEach((feedback, index) => {
+                feedbackDisplay.innerHTML += `
+                    <div class="feedback-item">
+                        <p><strong>${feedback.employeeName}</strong> (${new Date(feedback.date).toLocaleDateString()}): ${feedback.message}</p>
+                        ${feedback.reply ? `<p><strong>Admin Reply:</strong> ${feedback.reply}</p>` : ''}
+                        ${!feedback.reply ? `<button onclick="replyToFeedback(${index})"><i class="fas fa-reply"></i> Reply</button>` : ''}
+                    </div>
+                `;
+            });
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle('dark-theme');
+            const isDarkTheme = document.body.classList.contains('dark-theme');
+            localStorage.setItem('darkTheme', isDarkTheme);
+        }
+
+        // Function to handle admin replies to feedback
+        function replyToFeedback(index) {
+            const reply = prompt('Enter your reply to the feedback:');
+            if (reply) {
+                employeeFeedback[index].reply = reply;
+                saveData();
+                displayEmployeeFeedback();
+            }
+        }
+
+        // New function to generate and display the employee report
+        function generateEmployeeReport(employeeId) {
+            const employee = employees.find(emp => emp.id === employeeId);
+            if (!employee) {
+                alert('Employee not found');
+                return;
+            }
+
+            const employeePayments = paymentHistory.flatMap(payment => 
+                payment.employees.filter(emp => emp.id === employeeId)
+                    .map(emp => ({ date: payment.date, amount: emp.amount }))
+            );
+
+            const reportContent = document.getElementById('employeeReportContent');
+            reportContent.innerHTML = `
+                <h3>${employee.name}'s Salary Report</h3>
+                <p><strong>Employee ID:</strong> ${employee.id}</p>
+                <p><strong>Department:</strong> ${employee.department}</p>
+                <p><strong>Current Salary:</strong> Ksh ${employee.salary}</p>
+                <h4>Salary History</h4>
+            `;
+
+            if (employeePayments.length === 0) {
+                reportContent.innerHTML += '<p>No salary history available for this employee.</p>';
+            } else {
+                reportContent.innerHTML += `
+                    <table>
+                        <tr>
+                            <th>Date</th>
+                            <th>Amount Paid</th>
+                        </tr>
+                        ${employeePayments.map(payment => `
+                            <tr>
+                                <td>${new Date(payment.date).toLocaleDateString()}</td>
+                                <td>Ksh ${payment.amount.toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                `;
+            }
+
+            showModal('employeeReport');
+        }
+
+        // Event listeners
+        document.getElementById('addEmployeeForm').addEventListener('submit', addEmployee);
+        document.getElementById('addDepartmentForm').addEventListener('submit', addDepartment);
+        document.getElementById('deductionForm').addEventListener('submit', updateDeductionRates);
+        document.getElementById('allowanceForm').addEventListener('submit', updateAllowances);
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('darkTheme');
+        if (savedTheme === 'true') {
+            document.body.classList.add('dark-theme');
+        }
+
+        // Initialize tables
+        updateEmployeeTable();
+        updateDepartmentTable();
+        updateSalaryTable();
+
+        // Populate initial values for deduction rates and allowances
+        document.getElementById('nhifRate').value = deductionRates.nhif;
+        document.getElementById('nssfRate').value = deductionRates.nssf;
+        document.getElementById('payeRate').value = deductionRates.paye;
+        document.getElementById('housingRate').value = deductionRates.housing;
+        document.getElementById('houseAllowance').value = allowances.house;
+        document.getElementById('transportAllowance').value = allowances.transport;
+        document.getElementById('hardshipAllowance').value = allowances.hardship;
+    </script>
+</body>
+</html>
